@@ -49,6 +49,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - name: Emulatoren zwischenspeichern
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('tests/rules/package-lock.json') }}
       - run: npm ci
         working-directory: tests/rules
       - name: Regeln gegen den Emulator testen
