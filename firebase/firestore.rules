@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// Datenmodell
+//   users/{uid}                          { familyId }               – von Hand in der Konsole angelegt
+//   families/{familyId}                  { members: [uid, ...] }    – von Hand in der Konsole angelegt
+//   families/{familyId}/settings/game    { flights: [int], timeLimitMinutes: int | null }
+//   families/{familyId}/photos/{id}      { role, name?, path, updatedAt }
+//   families/{familyId}/recordings/{key} { path, updatedAt }
+//
+// Grundsatz: Nur angemeldete Familienmitglieder lesen und schreiben ihre Familiendaten.
+// Konten und Mitgliedschaften legt nur die Konsole an, die App nie.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(familyId) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.members;
+    }
+
+    function guestsOk(flights, i) {
+      return flights.size() <= i || (flights[i] is int && flights[i] >= 1 && flights[i] <= 10);
+    }
+
+    function validSettings(d) {
+      return d.keys().hasOnly(['flights', 'timeLimitMinutes', 'updatedAt'])
+        && d.flights is list
+        && d.flights.size() >= 1 && d.flights.size() <= 5
+        && guestsOk(d.flights, 0) && guestsOk(d.flights, 1) && guestsOk(d.flights, 2)
+        && guestsOk(d.flights, 3) && guestsOk(d.flights, 4)
+        && (d.timeLimitMinutes == null || (d.timeLimitMinutes is int && d.timeLimitMinutes > 0 && d.timeLimitMinutes <= 120));
+    }
+
+    function validPhoto(d, familyId, id) {
+      return d.keys().hasOnly(['role', 'name', 'path', 'updatedAt'])
+        && d.role in ['pilot', 'passenger', 'reward']
+        && (!('name' in d) || (d.name is string && d.name.size() <= 30))
+        && d.path == 'families/' + familyId + '/photos/' + id + '.webp';
+    }
+
+    function validRecording(d, familyId, key) {
+      return d.keys().hasOnly(['path', 'updatedAt'])
+        && d.path == 'families/' + familyId + '/voice/' + key + '.m4a';
+    }
+
+    // Eigener Nutzer-Eintrag: nur lesen, um die Familie zu finden.
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /families/{familyId} {
+      allow read: if isMember(familyId);
+      allow write: if false;
+
+      match /settings/game {
+        allow read: if isMember(familyId);
+        allow write: if isMember(familyId) && validSettings(request.resource.data);
+      }
+
+      match /photos/{photoId} {
+        allow read, delete: if isMember(familyId);
+        allow create, update: if isMember(familyId) && validPhoto(request.resource.data, familyId, photoId);
+      }
+
+      match /recordings/{key} {
+        allow read, delete: if isMember(familyId);
+        allow create, update: if isMember(familyId)
+          && key.matches('^(count-([1-9]|10)|line-[a-zA-Z]+|name-[A-Za-z0-9_-]+)$')
+          && validRecording(request.resource.data, familyId, key);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
