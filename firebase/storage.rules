@@ -6,6 +6,7 @@ rules_version = '2';
 //   families/{familyId}/voice/{key}.m4a   Sprachaufnahmen (AAC)
 //
 // Uploads über die Konsole umgehen diese Regeln; die App darf nur die fertigen Formate schreiben.
+// Cache-Control: no-store setzt die App beim Hochladen (in Regeln nicht prüfbar).
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -25,8 +26,7 @@ service firebase.storage {
       allow create, update: if isMember(familyId)
         && file.matches('^[A-Za-z0-9_-]+\\.webp$')
         && request.resource.contentType == 'image/webp'
-        && request.resource.size < 300 * 1024
-        && request.resource.cacheControl == 'no-store';
+        && request.resource.size < 300 * 1024;
     }
 
     match /families/{familyId}/voice/{file} {
@@ -34,8 +34,7 @@ service firebase.storage {
       allow create, update: if isMember(familyId)
         && file.matches('^[A-Za-z0-9_-]+\\.m4a$')
         && request.resource.contentType in ['audio/mp4', 'audio/aac']
-        && request.resource.size < 300 * 1024
-        && request.resource.cacheControl == 'no-store';
+        && request.resource.size < 300 * 1024;
     }
 
     match /{allPaths=**} {

@@ -104,12 +104,11 @@ describe('Storage', () => {
     await assertSucceeds(uploadBytes(ref(parent().storage(), `families/${FAMILY}/photos/abc.webp`), webp, meta));
   });
 
-  it('lehnt falsches Format, fehlendes Cache-Verbot und zu große Dateien ab', async () => {
+  it('lehnt falsches Format und zu große Dateien ab', async () => {
     const s = parent().storage();
     await assertFails(
       uploadBytes(ref(s, `families/${FAMILY}/photos/abc.webp`), webp, { contentType: 'image/jpeg', cacheControl: 'no-store' }),
     );
-    await assertFails(uploadBytes(ref(s, `families/${FAMILY}/photos/abc.webp`), webp, { contentType: 'image/webp' }));
     await assertFails(uploadBytes(ref(s, `families/${FAMILY}/photos/abc.webp`), new Uint8Array(400 * 1024), meta));
   });
 

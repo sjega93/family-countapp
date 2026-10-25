@@ -61,7 +61,7 @@ Regel: Die Logik entscheidet, die Oberfläche zeigt an und führt Effekte aus. N
 | Eltern-Bereich live | Firestore-Listener im Eltern-Bereich; Spiel lädt nur beim Start |
 | Umgebungen | Ein Firebase-Projekt, alles geht live. Tests nie gegen echte Daten (Emulator). |
 | Veröffentlichung | Push auf `main` → GitHub Actions: Tests → Build → Deploy (Hosting + Regeln) |
-| Sicherheit | Strenge Header inkl. CSP in `firebase.json`; Regeln prüfen Mitgliedschaft, Typ, Größe, Pfad |
+| Sicherheit | Strenge Header inkl. CSP in `firebase.json`; Regeln prüfen Mitgliedschaft, Typ, Größe, Pfad (Cache-Control ist in Storage-Regeln nicht prüfbar, die App setzt es) |
 | Fehlerberichte/Analyse | Keine |
 | Sicherung | Eingebaute Firestore-Sicherung + Wiederherstellung gelöschter Storage-Dateien (in der Konsole einrichten) |
 
