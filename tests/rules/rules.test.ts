@@ -95,7 +95,8 @@ describe('Fotos', () => {
   it('lehnt falsches Format, falsche Rolle, zu große und leere Dateien ab', async () => {
     const db = parent().firestore();
     const ref = doc(db, `families/${FAMILY}/photos/abc`);
-    await assertFails(setDoc(ref, photo({ mime: 'image/jpeg' })));
+    await assertSucceeds(setDoc(ref, photo({ mime: 'image/jpeg' })));
+    await assertFails(setDoc(ref, photo({ mime: 'image/png' })));
     await assertFails(setDoc(ref, photo({ role: 'chef' })));
     await assertFails(setDoc(ref, photo({ data: bytes(400 * 1024) })));
     await assertFails(setDoc(ref, photo({ data: bytes(0) })));

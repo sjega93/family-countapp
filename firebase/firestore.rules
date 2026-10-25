@@ -4,7 +4,7 @@ rules_version = '2';
 //   users/{uid}                          { familyId }               – von Hand in der Konsole angelegt
 //   families/{familyId}                  { members: [uid, ...] }    – von Hand in der Konsole angelegt
 //   families/{familyId}/settings/game    { flights: [int], timeLimitMinutes: int | null, updatedAt? }
-//   families/{familyId}/photos/{id}      { role, name?, mime: 'image/webp', data: bytes, updatedAt? }
+//   families/{familyId}/photos/{id}      { role, name?, mime: 'image/webp' | 'image/jpeg', data: bytes, updatedAt? }
 //   families/{familyId}/recordings/{key} { mime: 'audio/mp4', data: bytes, updatedAt? }
 //
 // Grundsatz: Nur angemeldete Familienmitglieder lesen und schreiben ihre Familiendaten.
@@ -50,7 +50,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['role', 'name', 'mime', 'data', 'updatedAt'])
         && d.role in ['pilot', 'passenger', 'reward']
         && (!('name' in d) || (d.name is string && d.name.size() <= 30))
-        && validBlob(d, ['image/webp']);
+        && validBlob(d, ['image/webp', 'image/jpeg']);
     }
 
     function validRecording(d) {

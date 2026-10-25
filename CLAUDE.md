@@ -33,9 +33,11 @@ src/
     faces.ts      FaceInfo: Foto-URL oder gezeichnetes Platzhalter-Gesicht
   services/
     audio/        sounds.ts (Web Audio, im Code erzeugt), voice.ts (Aufnahme → sonst Gerätestimme)
-    data/         (Etappe 3) Laden aus Firebase in den Arbeitsspeicher
-    photos/       (Etappe 3) Gesichtserkennung, Zuschnitt, WebP
-  firebase/       Web-Konfiguration aus Umgebungsvariablen; fehlt sie → Demo-Modus
+    data/         family.ts: Anmeldung, Familie, Einstellungen, Fotos (Firestore → Arbeitsspeicher, Blob-URLs)
+    photos/       crop.ts (Zuschnitt-Rechnung, getestet), process.ts (laden, Gesicht finden, 512×512 rendern)
+  firebase/       config.ts (Umgebungsvariablen; fehlt sie → Demo-Modus), app.ts (Init, nur Memory-Cache)
+  ui/session.ts   Zustand: demo | signed-out | loading | ready | error
+  logic/cast.ts   Pilot/Passagiere/Belohnung aus Fotos, fehlende Passagiere mit Platzhaltern auffüllen
 firebase/         Sicherheitsregeln und Indizes (als Code, werden mit deployt)
 tests/unit        Vitest: Logik, Geometrie
 tests/e2e         Playwright: Klick-Tests mit Screenshots in drei Bildschirmgrößen
@@ -54,7 +56,7 @@ Regel: Die Logik entscheidet, die Oberfläche zeigt an und führt Effekte aus. N
 | Spielablauf | Eigene Zustandsmaschine in `logic/game.ts` |
 | Ton | Web Audio, Geräusche synthetisch; Aufnahmen als AAC (.m4a), Stille entfernen + Lautstärke angleichen |
 | Ersatzstimme | speechSynthesis, de-DE (Hochdeutsch) |
-| Fotos | Eltern wählen Fotos im Eltern-Bereich aus der Galerie; Gesichtserkennung schlägt Kreis vor, Eltern korrigieren, Rolle (Pilot/Passagier/Belohnung) + Name; App speichert WebP 512×512 ohne EXIF als Bytes in `families/{id}/photos/{id}` (max. 300 KB). HEIC nur auf dem iPhone lesbar. |
+| Fotos | Eltern wählen Fotos im Eltern-Bereich aus der Galerie; Gesichtserkennung schlägt Kreis vor, Eltern korrigieren, Rolle (Pilot/Passagier/Belohnung) + Name; App speichert 512×512 ohne EXIF als Bytes in `families/{id}/photos/{id}` (max. 300 KB): WebP, falls das Gerät kein WebP erzeugen kann JPEG. Gesichtserkennung: `@vladmandic/face-api` TinyFaceDetector, Modell lokal unter `public/models/`, wird erst im Eltern-Bereich geladen und nicht vorab gecacht. HEIC nur auf dem iPhone lesbar. |
 | Speicherung | Nur Cloud (Firestore); beim Start alles in den Arbeitsspeicher laden; Firestore nur mit Memory-Cache, **nie** `persistentLocalCache`; nichts dauerhaft auf dem Gerät. Offline-Modus später über eine Zwischenschicht im Daten-Dienst. |
 | Backend | Nur Firebase im **Spark-Tarif** (kostenlos): Auth (E-Mail/Passwort), Firestore, Hosting. **Kein Cloud Storage** (bräuchte Blaze), Fotos und Aufnahmen als Bytes in Firestore. **Keine Cloud Functions.** App Check. Region europe-west3. Wechsel zu Storage später im Daten-Dienst kapselbar. |
 | Konten | Familie mit mehreren Konten; Konten und `families/{id}.members` nur von Hand in der Konsole, keine Selbst-Registrierung |
@@ -91,13 +93,14 @@ gezeichnet (`ui/art/Face.svelte`).
 - Firebase-Projekt `family-countapp` (Spark-Tarif), Firestore in europe-west3, Anmeldung E-Mail/Passwort aktiv.
 - GitHub-Variablen: `FIREBASE_PROJECT_ID`, `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_APP_ID`.
 - GitHub-Secret: `FIREBASE_SERVICE_ACCOUNT` (Dienstkonto `github-deploy`, Rollen Firebase Admin + Service Usage Consumer).
-- Offen: App Check (`VITE_APPCHECK_SITE_KEY`), Familie in Firestore anlegen (`families/{id}`, `users/{uid}`).
+- Familie: `families/familie { members: [uid…] }`, `users/{uid} { familyId: 'familie' }` (von Hand in der Konsole).
+- Offen: App Check (`VITE_APPCHECK_SITE_KEY`, optional).
 
 ## Etappen
 
 1. ✅ Grundgerüst: Spiel spielbar mit Platzhalter-Gesichtern und Gerätestimme, Eltern-Bereich mit Einstellungen
    (nur im Arbeitsspeicher), Regeln, CI.
 2. Spiel verfeinern: Landschaften/Reiseziele, Animationen, echte Geräte testen (iPhone-Ton!).
-3. Firebase: Anmeldung, Familie laden, Einstellungen speichern, Fotos aus der Galerie verarbeiten,
-   Sprachaufnahmen (AAC, Aufbereitung), Ersatzstimme für fehlende Aufnahmen, App Check.
+3. Firebase: ✅ Anmeldung, Familie laden, Einstellungen speichern, Fotos aus der Galerie verarbeiten.
+   Offen: Sprachaufnahmen (AAC, Aufbereitung), App Check.
 4. Feinschliff: Zeitlimit-Abschluss, Fehlende-Fotos/Aufnahmen-Hinweise, Sicherung einrichten.

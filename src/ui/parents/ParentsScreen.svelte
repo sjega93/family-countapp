@@ -9,22 +9,75 @@
     withGuests,
     type GameSettings,
   } from '../../logic/settings';
+  import { errorMessage, login, logout, resetPassword } from '../../services/data/family';
+  import type { Session } from '../session';
+  import PhotosSection from './PhotosSection.svelte';
 
   interface Props {
+    session: Session;
     settings: GameSettings;
-    availablePhotos: number;
-    demoMode: boolean;
-    onSave: (s: GameSettings) => void;
+    onSave: (s: GameSettings) => Promise<void>;
+    onRetry: () => void;
     onClose: () => void;
   }
 
-  let { settings, availablePhotos, demoMode, onSave, onClose }: Props = $props();
+  let { session, settings, onSave, onRetry, onClose }: Props = $props();
 
   // svelte-ignore state_referenced_locally
   let draft = $state<GameSettings>({ ...settings, flights: settings.flights.slice() });
   const needed = $derived(requiredPassengerPhotos(draft));
-  const enough = $derived(availablePhotos >= needed);
   const LIMITS = [null, 5, 10, 15, 20, 30];
+
+  let email = $state('');
+  let password = $state('');
+  let accountMsg = $state('');
+  let accountBusy = $state(false);
+  let saveMsg = $state('');
+  let saving = $state(false);
+
+  async function doLogin(e: SubmitEvent) {
+    e.preventDefault();
+    accountBusy = true;
+    accountMsg = '';
+    try {
+      await login(email, password);
+      password = '';
+    } catch (err) {
+      accountMsg = errorMessage(err);
+    } finally {
+      accountBusy = false;
+    }
+  }
+
+  async function doReset() {
+    if (!email.trim()) {
+      accountMsg = 'Bitte zuerst die E-Mail-Adresse eingeben.';
+      return;
+    }
+    try {
+      await resetPassword(email);
+      accountMsg = 'Falls das Konto existiert, ist eine E-Mail zum Zurücksetzen unterwegs.';
+    } catch (err) {
+      accountMsg = errorMessage(err);
+    }
+  }
+
+  async function doLogout() {
+    if (!confirm('Abmelden? Danach zeigt das Spiel auf diesem Gerät wieder Platzhalter-Gesichter.')) return;
+    await logout();
+  }
+
+  async function save() {
+    saving = true;
+    saveMsg = '';
+    try {
+      await onSave(draft);
+    } catch (err) {
+      saveMsg = errorMessage(err);
+    } finally {
+      saving = false;
+    }
+  }
 </script>
 
 <div class="parents">
@@ -33,11 +86,44 @@
     <button class="link" onclick={onClose}>Zurück zum Spiel</button>
   </header>
 
-  {#if demoMode}
-    <p class="note">
-      Demo-Modus: Es werden gezeichnete Platzhalter-Gesichter und die Gerätestimme verwendet. Anmeldung, eure Fotos
-      und Aufnahmen folgen in einer späteren Etappe. Einstellungen gelten nur, bis die App geschlossen wird.
-    </p>
+  <section>
+    <h2>Konto</h2>
+    {#if session.kind === 'demo'}
+      <p class="note">
+        Demo-Modus: Diese Version ist nicht mit Firebase verbunden. Es werden gezeichnete Gesichter und die
+        Gerätestimme verwendet.
+      </p>
+    {:else if session.kind === 'signed-out'}
+      <p class="muted">Melde dich an, damit eure Fotos im Spiel erscheinen. Das Konto bleibt auf diesem Gerät angemeldet.</p>
+      <form onsubmit={doLogin}>
+        <label>
+          <span>E-Mail</span>
+          <input type="email" autocomplete="username" bind:value={email} required />
+        </label>
+        <label>
+          <span>Passwort</span>
+          <input type="password" autocomplete="current-password" bind:value={password} required />
+        </label>
+        <button class="primary" type="submit" disabled={accountBusy}>{accountBusy ? 'Anmelden …' : 'Anmelden'}</button>
+        <button class="link" type="button" onclick={doReset}>Passwort vergessen?</button>
+      </form>
+    {:else}
+      <div class="row">
+        <span>Angemeldet als <strong>{session.user.email}</strong></span>
+        <button class="link" onclick={doLogout}>Abmelden</button>
+      </div>
+      {#if session.kind === 'loading'}
+        <p class="muted">Familie wird geladen …</p>
+      {:else if session.kind === 'error'}
+        <p class="warn">{session.message}</p>
+        <button class="secondary" onclick={onRetry}>Erneut versuchen</button>
+      {/if}
+    {/if}
+    {#if accountMsg}<p class="warn">{accountMsg}</p>{/if}
+  </section>
+
+  {#if session.kind === 'ready'}
+    <PhotosSection familyId={session.family.familyId} neededPassengers={needed} />
   {/if}
 
   <section>
@@ -77,9 +163,6 @@
         </div>
       </div>
     {/each}
-    {#if !enough}
-      <p class="warn">Für {needed} Gäste braucht es {needed} Passagierfotos, vorhanden sind {availablePhotos}.</p>
-    {/if}
   </section>
 
   <section>
@@ -95,7 +178,13 @@
     </div>
   </section>
 
-  <button class="primary" disabled={!enough} onclick={() => onSave(draft)}>Speichern und Spiel neu starten</button>
+  {#if session.kind !== 'ready'}
+    <p class="muted center">Ohne Anmeldung gelten die Einstellungen nur, bis die App geschlossen wird.</p>
+  {/if}
+  {#if saveMsg}<p class="warn center">{saveMsg}</p>{/if}
+  <button class="primary wide" disabled={saving} onclick={save}>
+    {saving ? 'Wird gespeichert …' : 'Speichern und Spiel neu starten'}
+  </button>
 </div>
 
 <style>
@@ -127,8 +216,8 @@
     margin: 0 0 8px;
   }
   section,
-  .note,
-  .primary {
+  .wide,
+  .center {
     max-width: 560px;
     margin: 0 auto 16px;
   }
@@ -143,11 +232,44 @@
     background: #fdf2d0;
     border-radius: 12px;
     padding: 10px 14px;
+    margin: 0;
+  }
+  .muted {
+    color: #6b7280;
+    font-size: 14px;
+  }
+  .center {
+    text-align: center;
+  }
+  .warn {
+    color: #b91c1c;
+    font-size: 14px;
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+    color: #4b5563;
+  }
+  form input {
+    font-size: 16px;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    color: #1f2937;
   }
   .row {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     padding: 6px 0;
     border-top: 1px solid #f0ede6;
   }
@@ -195,14 +317,7 @@
     border-color: #1f3a5f;
     color: #fff;
   }
-  .warn {
-    color: #b91c1c;
-    font-size: 14px;
-    margin: 8px 0 0;
-  }
   .primary {
-    display: block;
-    width: 100%;
     padding: 14px;
     border: none;
     border-radius: 12px;
@@ -213,6 +328,18 @@
   }
   .primary:disabled {
     opacity: 0.4;
+  }
+  .wide {
+    display: block;
+    width: 100%;
+  }
+  .secondary {
+    padding: 10px 14px;
+    border: 1px solid #1f3a5f;
+    border-radius: 10px;
+    background: #fff;
+    color: #1f3a5f;
+    font-size: 15px;
   }
   .link {
     border: none;

@@ -44,6 +44,7 @@ test('Jumbo mit 9 Gästen: nur die vorderen drei sind antippbar', async ({ page 
   await openParents(page);
   for (let i = 0; i < 6; i++) await page.getByLabel('Mehr Gäste in Flug 1').click();
   await page.getByRole('button', { name: 'Speichern und Spiel neu starten' }).click();
+  await page.getByLabel('Spiel starten').click();
   await expect(page.getByLabel('Flugzeug mit 9 Plätzen')).toBeVisible();
   await expect(page.getByLabel('Gast einsteigen lassen')).toHaveCount(3);
   await boardAll(page, 5);
@@ -79,5 +80,6 @@ test('Einstellungen ändern die Gästezahl', async ({ page }) => {
   await page.getByLabel('Weniger Gäste in Flug 1').click();
   await page.getByLabel('Weniger Gäste in Flug 1').click();
   await page.getByRole('button', { name: 'Speichern und Spiel neu starten' }).click();
+  await page.getByLabel('Spiel starten').click();
   await expect(page.getByLabel('Flugzeug mit 1 Plätzen')).toBeVisible();
 });

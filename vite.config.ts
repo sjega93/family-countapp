@@ -30,11 +30,16 @@ export default defineConfig({
       workbox: {
         // Nur der App-Code wird offline vorgehalten; Fotos und Aufnahmen nie.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        // Gesichtserkennung nur bei Bedarf laden (Eltern-Bereich), nicht vorab aufs Gerät
+        globIgnores: ['**/face-api*.js'],
         navigateFallback: '/index.html',
         runtimeCaching: [],
       },
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 1500,
+  },
   test: {
     include: ['tests/unit/**/*.test.ts'],
   },
