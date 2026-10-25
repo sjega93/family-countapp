@@ -86,6 +86,13 @@ sich dort nicht herunterladen; Regel-Tests laufen in GitHub Actions.
 Fotos und Aufnahmen gehören **nie** ins Repo, nicht in Tests, nicht in Screenshots. Platzhalter-Gesichter sind
 gezeichnet (`ui/art/Face.svelte`).
 
+## Setup-Stand
+
+- Firebase-Projekt `family-countapp` (Spark-Tarif), Firestore in europe-west3, Anmeldung E-Mail/Passwort aktiv.
+- GitHub-Variablen: `FIREBASE_PROJECT_ID`, `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_APP_ID`.
+- GitHub-Secret: `FIREBASE_SERVICE_ACCOUNT` (Dienstkonto `github-deploy`, Rollen Firebase Admin + Service Usage Consumer).
+- Offen: App Check (`VITE_APPCHECK_SITE_KEY`), Familie in Firestore anlegen (`families/{id}`, `users/{uid}`).
+
 ## Etappen
 
 1. ✅ Grundgerüst: Spiel spielbar mit Platzhalter-Gesichtern und Gerätestimme, Eltern-Bereich mit Einstellungen
