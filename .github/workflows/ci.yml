@@ -51,8 +51,19 @@ jobs:
           java-version: 21
       - run: npm ci
         working-directory: tests/rules
-      - run: npm test
+      - name: Regeln gegen den Emulator testen
         working-directory: tests/rules
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee rules.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Protokollende als Anmerkung, damit es auch ohne Log-Download lesbar ist
+            msg=$(tail -n 60 rules.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Regel-Tests::${msg}"
+          fi
+          exit $status
 
   deploy:
     name: Veröffentlichen
