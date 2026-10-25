@@ -1,17 +1,22 @@
 rules_version = '2';
 
-// Datenmodell
+// Datenmodell (Spark-Tarif: Fotos und Aufnahmen liegen als Bytes direkt in Firestore, kein Cloud Storage)
 //   users/{uid}                          { familyId }               – von Hand in der Konsole angelegt
 //   families/{familyId}                  { members: [uid, ...] }    – von Hand in der Konsole angelegt
-//   families/{familyId}/settings/game    { flights: [int], timeLimitMinutes: int | null }
-//   families/{familyId}/photos/{id}      { role, name?, path, updatedAt }
-//   families/{familyId}/recordings/{key} { path, updatedAt }
+//   families/{familyId}/settings/game    { flights: [int], timeLimitMinutes: int | null, updatedAt? }
+//   families/{familyId}/photos/{id}      { role, name?, mime: 'image/webp', data: bytes, updatedAt? }
+//   families/{familyId}/recordings/{key} { mime: 'audio/mp4', data: bytes, updatedAt? }
 //
 // Grundsatz: Nur angemeldete Familienmitglieder lesen und schreiben ihre Familiendaten.
 // Konten und Mitgliedschaften legt nur die Konsole an, die App nie.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Obergrenze pro Foto bzw. Aufnahme (Firestore erlaubt bis 1 MiB pro Eintrag)
+    function maxBytes() {
+      return 300 * 1024;
+    }
 
     function signedIn() {
       return request.auth != null;
@@ -35,16 +40,22 @@ service cloud.firestore {
         && (d.timeLimitMinutes == null || (d.timeLimitMinutes is int && d.timeLimitMinutes > 0 && d.timeLimitMinutes <= 120));
     }
 
-    function validPhoto(d, familyId, id) {
-      return d.keys().hasOnly(['role', 'name', 'path', 'updatedAt'])
-        && d.role in ['pilot', 'passenger', 'reward']
-        && (!('name' in d) || (d.name is string && d.name.size() <= 30))
-        && d.path == 'families/' + familyId + '/photos/' + id + '.webp';
+    function validBlob(d, mimes) {
+      return d.mime in mimes
+        && d.data is bytes
+        && d.data.size() > 0 && d.data.size() <= maxBytes();
     }
 
-    function validRecording(d, familyId, key) {
-      return d.keys().hasOnly(['path', 'updatedAt'])
-        && d.path == 'families/' + familyId + '/voice/' + key + '.m4a';
+    function validPhoto(d) {
+      return d.keys().hasOnly(['role', 'name', 'mime', 'data', 'updatedAt'])
+        && d.role in ['pilot', 'passenger', 'reward']
+        && (!('name' in d) || (d.name is string && d.name.size() <= 30))
+        && validBlob(d, ['image/webp']);
+    }
+
+    function validRecording(d) {
+      return d.keys().hasOnly(['mime', 'data', 'updatedAt'])
+        && validBlob(d, ['audio/mp4', 'audio/aac']);
     }
 
     // Eigener Nutzer-Eintrag: nur lesen, um die Familie zu finden.
@@ -64,14 +75,16 @@ service cloud.firestore {
 
       match /photos/{photoId} {
         allow read, delete: if isMember(familyId);
-        allow create, update: if isMember(familyId) && validPhoto(request.resource.data, familyId, photoId);
+        allow create, update: if isMember(familyId)
+          && photoId.matches('^[A-Za-z0-9_-]{1,64}$')
+          && validPhoto(request.resource.data);
       }
 
       match /recordings/{key} {
         allow read, delete: if isMember(familyId);
         allow create, update: if isMember(familyId)
           && key.matches('^(count-([1-9]|10)|line-[a-zA-Z]+|name-[A-Za-z0-9_-]+)$')
-          && validRecording(request.resource.data, familyId, key);
+          && validRecording(request.resource.data);
       }
     }
 

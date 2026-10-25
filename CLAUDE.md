@@ -39,7 +39,7 @@ src/
 firebase/         Sicherheitsregeln und Indizes (als Code, werden mit deployt)
 tests/unit        Vitest: Logik, Geometrie
 tests/e2e         Playwright: Klick-Tests mit Screenshots in drei Bildschirmgrößen
-tests/rules       Eigenes Paket (firebase@12 wegen rules-unit-testing): Regeln gegen den Emulator
+tests/rules       Eigenes Paket (firebase@12 wegen rules-unit-testing): Firestore-Regeln gegen den Emulator
 ```
 
 Regel: Die Logik entscheidet, die Oberfläche zeigt an und führt Effekte aus. Neue Spielregeln immer zuerst in
@@ -54,16 +54,16 @@ Regel: Die Logik entscheidet, die Oberfläche zeigt an und führt Effekte aus. N
 | Spielablauf | Eigene Zustandsmaschine in `logic/game.ts` |
 | Ton | Web Audio, Geräusche synthetisch; Aufnahmen als AAC (.m4a), Stille entfernen + Lautstärke angleichen |
 | Ersatzstimme | speechSynthesis, de-DE (Hochdeutsch) |
-| Fotos | Originale per Firebase-Konsole nach `families/{id}/eingang/`; App: Gesichtserkennung schlägt Kreis vor, Eltern korrigieren, Rolle (Pilot/Passagier/Belohnung) + Name; speichert WebP 512×512 ohne EXIF nach `photos/`, löscht Original. HEIC nur auf dem iPhone lesbar. |
-| Speicherung | Nur Cloud; beim Start alles in den Arbeitsspeicher laden; nichts dauerhaft auf dem Gerät; Uploads mit `Cache-Control: no-store`. Offline-Modus später über eine Zwischenschicht im Daten-Dienst. |
-| Backend | Nur Firebase: Auth (E-Mail/Passwort), Firestore, Storage, Hosting. **Keine Cloud Functions** (später nachrüstbar). App Check. Region europe-west3. |
+| Fotos | Eltern wählen Fotos im Eltern-Bereich aus der Galerie; Gesichtserkennung schlägt Kreis vor, Eltern korrigieren, Rolle (Pilot/Passagier/Belohnung) + Name; App speichert WebP 512×512 ohne EXIF als Bytes in `families/{id}/photos/{id}` (max. 300 KB). HEIC nur auf dem iPhone lesbar. |
+| Speicherung | Nur Cloud (Firestore); beim Start alles in den Arbeitsspeicher laden; Firestore nur mit Memory-Cache, **nie** `persistentLocalCache`; nichts dauerhaft auf dem Gerät. Offline-Modus später über eine Zwischenschicht im Daten-Dienst. |
+| Backend | Nur Firebase im **Spark-Tarif** (kostenlos): Auth (E-Mail/Passwort), Firestore, Hosting. **Kein Cloud Storage** (bräuchte Blaze), Fotos und Aufnahmen als Bytes in Firestore. **Keine Cloud Functions.** App Check. Region europe-west3. Wechsel zu Storage später im Daten-Dienst kapselbar. |
 | Konten | Familie mit mehreren Konten; Konten und `families/{id}.members` nur von Hand in der Konsole, keine Selbst-Registrierung |
 | Eltern-Bereich live | Firestore-Listener im Eltern-Bereich; Spiel lädt nur beim Start |
 | Umgebungen | Ein Firebase-Projekt, alles geht live. Tests nie gegen echte Daten (Emulator). |
 | Veröffentlichung | Push auf `main` → GitHub Actions: Tests → Build → Deploy (Hosting + Regeln) |
-| Sicherheit | Strenge Header inkl. CSP in `firebase.json`; Regeln prüfen Mitgliedschaft, Typ, Größe, Pfad (Cache-Control ist in Storage-Regeln nicht prüfbar, die App setzt es) |
+| Sicherheit | Strenge Header inkl. CSP in `firebase.json`; Firestore-Regeln prüfen Mitgliedschaft, Felder, MIME-Typ und Größe der Bytes |
 | Fehlerberichte/Analyse | Keine |
-| Sicherung | Eingebaute Firestore-Sicherung + Wiederherstellung gelöschter Storage-Dateien (in der Konsole einrichten) |
+| Sicherung | Im Spark-Tarif keine verwaltete Sicherung; Export-Funktion im Eltern-Bereich vorsehen (Etappe 4) |
 
 ## Befehle
 
@@ -91,6 +91,6 @@ gezeichnet (`ui/art/Face.svelte`).
 1. ✅ Grundgerüst: Spiel spielbar mit Platzhalter-Gesichtern und Gerätestimme, Eltern-Bereich mit Einstellungen
    (nur im Arbeitsspeicher), Regeln, CI.
 2. Spiel verfeinern: Landschaften/Reiseziele, Animationen, echte Geräte testen (iPhone-Ton!).
-3. Firebase: Anmeldung, Familie laden, Einstellungen speichern, Fotos aus dem Eingang verarbeiten,
+3. Firebase: Anmeldung, Familie laden, Einstellungen speichern, Fotos aus der Galerie verarbeiten,
    Sprachaufnahmen (AAC, Aufbereitung), Ersatzstimme für fehlende Aufnahmen, App Check.
 4. Feinschliff: Zeitlimit-Abschluss, Fehlende-Fotos/Aufnahmen-Hinweise, Sicherung einrichten.

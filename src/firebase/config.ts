@@ -8,7 +8,6 @@ export interface FirebaseWebConfig {
   apiKey: string;
   authDomain: string;
   projectId: string;
-  storageBucket: string;
   appId: string;
   appCheckSiteKey: string;
 }
@@ -19,7 +18,6 @@ export function firebaseConfig(): FirebaseWebConfig | null {
     apiKey: env.VITE_FIREBASE_API_KEY,
     authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
     projectId: env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
     appId: env.VITE_FIREBASE_APP_ID,
     appCheckSiteKey: env.VITE_APPCHECK_SITE_KEY,
   };
